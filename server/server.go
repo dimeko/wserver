@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/dimeko/wserver/models"
 	"github.com/google/uuid"
 	"golang.org/x/net/websocket"
 )
@@ -17,20 +18,6 @@ type Client struct {
 }
 
 type Connections map[uuid.UUID]*Client
-
-type IncomingChatMessage struct {
-	Rcv_id  string `json:"rcv_id"`
-	Message string `json:"message"`
-	// Room      string `json:"room"`
-	Broadcast bool `json:"broadcast"`
-}
-
-type OutgoingChatMessage struct {
-	Sndr_id string `json:"sndr_id"`
-	Message string `json:"message"`
-	// Room      string `json:"room"`
-	Broadcast bool `json:"broadcast"`
-}
 
 type ChatMessage struct {
 	Sndr_id uuid.UUID
@@ -62,22 +49,22 @@ func (server *Server) WebSocketHandler(ws *websocket.Conn) {
 		uuid: client_uuid,
 		conn: ws,
 	}
-	keepConnection(ws, client_uuid, server.message_orch)
+	server.keepConnection(ws, client_uuid, server.message_orch)
 }
 
-func keepConnection(ws *websocket.Conn, client_uuid uuid.UUID, message_orch chan ChatMessage) {
+func (server *Server) keepConnection(ws *websocket.Conn, client_uuid uuid.UUID, message_orch chan ChatMessage) {
 	buf := make([]byte, 1024)
 	for {
 		size, err := ws.Read(buf)
 		if err != nil {
-			log.Printf("Something wrong with client: %s", ws.RemoteAddr())
-			log.Printf("Error is: %s", err)
+			log.Printf("Something wrong with client %s. Error %s", ws.RemoteAddr(), err.Error())
 			if err == io.EOF {
+				delete(server.conns, client_uuid)
 				break
 			}
 		}
 		msg := buf[:size]
-		var decoded_msg = &IncomingChatMessage{}
+		var decoded_msg = &models.ClientToServerMsg{}
 		log.Printf("Before decoding message: %s\n", msg)
 
 		err = json.Unmarshal(msg, decoded_msg)
@@ -85,7 +72,6 @@ func keepConnection(ws *websocket.Conn, client_uuid uuid.UUID, message_orch chan
 			log.Printf("Could not decode message. Error: %s", string(err.Error()))
 			continue
 		}
-		log.Printf("Message is %s", decoded_msg.Message)
 
 		var recv_uuid uuid.UUID
 		if decoded_msg.Broadcast {

@@ -3,6 +3,8 @@ package server
 import (
 	"encoding/json"
 	"log"
+
+	"github.com/dimeko/wserver/models"
 )
 
 func HubOrchestrator(server *Server) {
@@ -10,7 +12,7 @@ func HubOrchestrator(server *Server) {
 		select {
 		case incmng_msg := <-server.message_orch:
 
-			outgoing_message, err := json.Marshal(&OutgoingChatMessage{
+			outgoing_message, err := json.Marshal(&models.ServerToClientMsg{
 				Sndr_id:   incmng_msg.Sndr_id.String(),
 				Message:   incmng_msg.Message,
 				Broadcast: incmng_msg.Broadcast,
@@ -19,17 +21,19 @@ func HubOrchestrator(server *Server) {
 				log.Printf("Error encoding outgoing message: %s", err.Error())
 				continue
 			}
-			if user_conn, ok := server.conns[incmng_msg.Rcv_id]; ok {
+			if client, ok := server.conns[incmng_msg.Rcv_id]; ok {
 				log.Printf("Sending message to client: %s", incmng_msg.Rcv_id)
-				_, err := user_conn.conn.Write([]byte(outgoing_message))
+				_, err := client.conn.Write([]byte(outgoing_message))
 				if err != nil {
 					log.Printf("Error sending message: %s", err.Error())
 				}
 			} else {
 				if incmng_msg.Broadcast {
-					log.Printf("Broadcasting: %s", incmng_msg.Message)
 					for _, client := range server.conns {
-						client.conn.Write([]byte(outgoing_message))
+						_, err := client.conn.Write([]byte(outgoing_message))
+						if err != nil {
+							log.Printf("Error sending message: %s", err.Error())
+						}
 					}
 				} else {
 					log.Println("Wrong user UUID sent.")

@@ -1,7 +1,10 @@
 .PHONY: build run
 
 build:
-	@go build -o ./bin/ws_server main.go
+	@go build -o ./bin/wserver main.go
 
-run: build
-	@./bin/ws_server
+run-client: build
+	@./bin/wserver -usage=client
+
+run-server: build
+	@./bin/wserver -usage=server

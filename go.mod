@@ -1,4 +1,4 @@
-module github.com/dimeko/websockets
+module github.com/dimeko/wserver
 
 go 1.20
 
